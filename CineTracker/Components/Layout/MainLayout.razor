@@ -1,8 +1,21 @@
 ﻿@inherits LayoutComponentBase
 
+<!--
+    Layout principal de la aplicación CineTracker.
+    Este layout define la estructura común de todas las páginas:
+    - Barra de navegación superior (navbar)
+    - Área principal donde se renderiza el contenido de cada página (@Body)
+-->
+
 <div class="layout">
+    <!-- ===== NAVBAR ===== -->
     <nav class="navbar">
-        <a href="/" class="navbar-brand">CINE<span>Tracker</span></a>
+        <!-- Logo / marca de la app -->
+        <a href="/" class="navbar-brand">
+            CINE<span>Tracker</span>
+        </a>
+
+        <!-- Enlaces de navegación principales -->
         <div class="navbar-links">
             <a href="/" class="nav-link">🏠 Inicio</a>
             <a href="/buscar" class="nav-link">🔍 Buscar</a>
@@ -10,7 +23,9 @@
         </div>
     </nav>
 
+    <!-- ===== CONTENIDO PRINCIPAL ===== -->
     <main>
+        @* Aquí se renderiza el contenido específico de cada página *@
         @Body
     </main>
 </div>

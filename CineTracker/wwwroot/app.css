@@ -1,43 +1,50 @@
-/* ===== VARIABLES Y BASE ===== */
+/* ===========================
+   VARIABLES GLOBALES (THEME)
+=========================== */
 :root {
-    --primary: #e50914;
-    --primary-dark: #b20710;
-    --bg-dark: #141414;
-    --bg-card: #1f1f1f;
-    --bg-hover: #2a2a2a;
-    --text-primary: #ffffff;
-    --text-secondary: #b3b3b3;
-    --text-muted: #757575;
-    --border: #333333;
-    --shadow: 0 4px 20px rgba(0,0,0,0.5);
-    --radius: 8px;
-    --transition: all 0.3s ease;
+    --primary: #e50914; /* Color principal de la app (rojo Netflix) */
+    --primary-dark: #b20710; /* Versión más oscura del color primario */
+    --bg-dark: #141414; /* Fondo principal de la app */
+    --bg-card: #1f1f1f; /* Fondo para tarjetas/panels */
+    --bg-hover: #2a2a2a; /* Fondo hover de botones/tarjetas */
+    --text-primary: #ffffff; /* Color de texto principal */
+    --text-secondary: #b3b3b3; /* Color de texto secundario */
+    --text-muted: #757575; /* Color de texto atenuado */
+    --border: #333333; /* Color de bordes */
+    --shadow: 0 4px 20px rgba(0,0,0,0.5); /* Sombra global */
+    --radius: 8px; /* Radio de bordes global */
+    --transition: all 0.3s ease; /* Transición global para animaciones */
 }
 
+/* ===========================
+   RESET Y BASE
+=========================== */
 * {
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
+    box-sizing: border-box; /* Incluye padding y border dentro del ancho/alto */
 }
 
 body {
     background-color: var(--bg-dark);
     color: var(--text-primary);
     font-family: 'Segoe UI', sans-serif;
-    min-height: 100vh;
+    min-height: 100vh; /* Evita que el body sea más pequeño que la ventana */
 }
 
-/* ===== NAVBAR ===== */
+/* ===========================
+   NAVBAR
+=========================== */
 .navbar {
     background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%);
     padding: 16px 40px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    position: sticky;
+    position: sticky; /* Mantiene la navbar visible al hacer scroll */
     top: 0;
     z-index: 1000;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px); /* Efecto de desenfoque detrás de la navbar */
     border-bottom: 1px solid var(--border);
 }
 
@@ -50,7 +57,7 @@ body {
 }
 
     .navbar-brand span {
-        color: var(--text-primary);
+        color: var(--text-primary); /* Parte del nombre en color principal de texto */
     }
 
 .navbar-links {
@@ -73,7 +80,9 @@ body {
         background: var(--bg-hover);
     }
 
-/* ===== HERO SECTION ===== */
+/* ===========================
+   HERO SECTION
+=========================== */
 .hero {
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     padding: 80px 40px;
@@ -97,7 +106,7 @@ body {
 }
 
     .hero-title span {
-        color: var(--primary);
+        color: var(--primary); /* Destaca la parte del título */
     }
 
 .hero-subtitle {
@@ -107,7 +116,9 @@ body {
     position: relative;
 }
 
-/* ===== BUSCADOR ===== */
+/* ===========================
+   BUSCADOR
+=========================== */
 .search-container {
     max-width: 600px;
     margin: 0 auto;
@@ -156,7 +167,9 @@ body {
         background: var(--primary-dark);
     }
 
-/* ===== SECCIONES ===== */
+/* ===========================
+   SECCIONES GENERALES
+=========================== */
 .section {
     padding: 40px;
 }
@@ -178,14 +191,18 @@ body {
         margin-left: 16px;
     }
 
-/* ===== GRID DE PELÍCULAS ===== */
+/* ===========================
+   GRID DE PELÍCULAS
+=========================== */
 .movies-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 20px;
 }
 
-/* ===== TARJETA DE PELÍCULA ===== */
+/* ===========================
+   TARJETAS DE PELÍCULA
+=========================== */
 .movie-card {
     background: var(--bg-card);
     border-radius: var(--radius);
@@ -204,20 +221,9 @@ body {
 
 .movie-poster {
     width: 100%;
-    aspect-ratio: 2/3;
+    aspect-ratio: 2/3; /* Mantiene proporción de poster */
     object-fit: cover;
     display: block;
-}
-
-.movie-poster-placeholder {
-    width: 100%;
-    aspect-ratio: 2/3;
-    background: var(--bg-hover);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3rem;
-    color: var(--text-muted);
 }
 
 .movie-card-body {
@@ -230,7 +236,7 @@ body {
     margin-bottom: 6px;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
+    text-overflow: ellipsis; /* Trunca texto largo */
 }
 
 .movie-card-meta {
@@ -253,6 +259,9 @@ body {
     color: var(--text-muted);
 }
 
+/* ===========================
+   BOTONES Y OVERLAYS
+=========================== */
 .movie-card-overlay {
     position: absolute;
     inset: 0;
@@ -266,7 +275,7 @@ body {
 }
 
 .movie-card:hover .movie-card-overlay {
-    opacity: 1;
+    opacity: 1; /* Muestra overlay al hacer hover */
 }
 
 .overlay-buttons {
@@ -304,7 +313,9 @@ body {
         background: rgba(255,255,255,0.3);
     }
 
-/* ===== BOTONES GENERALES ===== */
+/* ===========================
+   BOTONES GENERALES
+=========================== */
 .btn {
     padding: 10px 20px;
     border-radius: var(--radius);
@@ -345,7 +356,9 @@ body {
         color: white;
     }
 
-/* ===== BADGES ===== */
+/* ===========================
+   BADGES
+=========================== */
 .badge {
     padding: 4px 10px;
     border-radius: 50px;
@@ -368,7 +381,9 @@ body {
     color: var(--primary);
 }
 
-/* ===== LOADING ===== */
+/* ===========================
+   LOADING
+=========================== */
 .loading-container {
     display: flex;
     flex-direction: column;
@@ -397,7 +412,9 @@ body {
     color: var(--text-secondary);
 }
 
-/* ===== EMPTY STATE ===== */
+/* ===========================
+   EMPTY STATE
+=========================== */
 .empty-state {
     text-align: center;
     padding: 80px 40px;
@@ -416,7 +433,9 @@ body {
     color: var(--text-secondary);
 }
 
-/* ===== TABS ===== */
+/* ===========================
+   TABS
+=========================== */
 .tabs {
     display: flex;
     gap: 4px;
@@ -445,7 +464,9 @@ body {
         border-bottom-color: var(--primary);
     }
 
-/* ===== TOAST NOTIFICACIÓN ===== */
+/* ===========================
+   TOAST
+=========================== */
 .toast {
     position: fixed;
     bottom: 30px;
@@ -473,7 +494,9 @@ body {
     }
 }
 
-/* ===== RESPONSIVE ===== */
+/* ===========================
+   RESPONSIVE
+=========================== */
 @media (max-width: 768px) {
     .navbar {
         padding: 12px 20px;

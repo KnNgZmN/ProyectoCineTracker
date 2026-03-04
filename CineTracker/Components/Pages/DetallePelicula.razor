@@ -1,15 +1,17 @@
-﻿@page "/pelicula/{TmdbId:int}"
+﻿@page "/pelicula/{TmdbId:int}"  // Ruta dinámica: recibe un ID de película de TMDB
 @using CineTracker.Models
 @using CineTracker.Services
-@inject TmdbService TmdbService
-@inject WatchlistService WatchlistService
-@inject NavigationManager Navigation
-@rendermode InteractiveServer
+@inject TmdbService TmdbService  // Servicio para obtener detalles de películas desde TMDB
+@inject WatchlistService WatchlistService  //Servicio para gestionar la lista de seguimiento del usuario
+@inject NavigationManager Navigation  // Servicio para navegar entre páginas
+@rendermode InteractiveServer  // Configura el renderizado interactivo en Blazor Server
 
+<!-- Título dinámico de la página -->
 <PageTitle>@(Movie?.Title ?? "Cargando...") — CineTracker</PageTitle>
 
 @if (IsLoading)
 {
+    <!-- Estado de carga mientras se obtiene la información de la película -->
     <div class="loading-container" style="height:80vh">
         <div class="spinner"></div>
         <span class="loading-text">Cargando película...</span>
@@ -17,6 +19,7 @@
 }
 else if (Movie is null)
 {
+    <!-- Estado cuando la película no existe o no se pudo obtener -->
     <div class="empty-state">
         <div class="empty-state-icon">❌</div>
         <div class="empty-state-title">Película no encontrada</div>
@@ -27,7 +30,7 @@ else if (Movie is null)
 }
 else
 {
-    <!-- BACKDROP -->
+    <!-- BACKDROP: imagen de fondo de la película -->
     @if (!string.IsNullOrEmpty(Movie.BackdropPath))
     {
         <div style="position:relative; height:400px; overflow:hidden;">
@@ -38,11 +41,11 @@ else
         </div>
     }
 
-    <!-- CONTENIDO PRINCIPAL -->
+    <!-- CONTENIDO PRINCIPAL DE LA PELÍCULA -->
     <div class="section" style="margin-top: @(string.IsNullOrEmpty(Movie.BackdropPath) ? "20px" : "-180px"); position:relative; z-index:1;">
         <div style="display:flex; gap:32px; flex-wrap:wrap;">
 
-            <!-- POSTER -->
+            <!-- POSTER DE LA PELÍCULA -->
             <div style="flex-shrink:0;">
                 @if (!string.IsNullOrEmpty(Movie.PosterPath))
                 {
@@ -52,19 +55,19 @@ else
                 }
             </div>
 
-            <!-- INFO -->
+            <!-- INFORMACIÓN PRINCIPAL -->
             <div style="flex:1; min-width:280px;">
-
                 <h1 style="font-size:2.2rem; font-weight:900; margin-bottom:8px;">@Movie.Title</h1>
 
                 @if (!string.IsNullOrEmpty(Movie.Tagline))
                 {
+                    <!-- Lema o frase de la película -->
                     <p style="color:var(--text-secondary); font-style:italic; margin-bottom:16px;">
                         "@Movie.Tagline"
                     </p>
                 }
 
-                <!-- METADATA -->
+                <!-- METADATOS: calificación, fecha de lanzamiento, duración -->
                 <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
                     <span style="color:#f5c518; font-weight:700; font-size:1.1rem;">
                         ⭐ @Movie.VoteAverage.ToString("F1")
@@ -108,12 +111,14 @@ else
                 <div style="display:flex; gap:12px; flex-wrap:wrap;">
                     @if (!IsInWatchlist)
                     {
+                        <!-- Botón para agregar la película a la lista de seguimiento -->
                         <button class="btn btn-primary" @onclick="AddToWatchlist">
                             + Agregar a Mi Lista
                         </button>
                     }
                     else
                     {
+                        <!-- Botones para gestionar la película en la lista (vista, favorito) -->
                         <button class="btn btn-secondary" disabled>
                             ✅ En tu lista
                         </button>
@@ -126,12 +131,13 @@ else
                             @(IsFavorite ? "💔 Quitar favorito" : "❤️ Favorito")
                         </button>
                     }
+                    <!-- Botón de navegación para volver al inicio -->
                     <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/")'>
                         ← Volver
                     </button>
                 </div>
 
-                <!-- TOAST -->
+                <!-- TOAST DE CONFIRMACIÓN -->
                 @if (ShowingToast)
                 {
                     <div style="margin-top:16px; padding:12px 16px; background:rgba(39,174,96,0.2);
@@ -145,8 +151,9 @@ else
 }
 
 @code {
-    [Parameter] public int TmdbId { get; set; }
+    [Parameter] public int TmdbId { get; set; }  // ID de la película recibido desde la URL
 
+    // Estado y datos de la película
     private TmdbMovieDetail? Movie;
     private bool IsLoading = true;
     private bool IsInWatchlist = false;
@@ -155,13 +162,15 @@ else
     private bool ShowingToast = false;
     private string ToastMessage = string.Empty;
 
+    // Inicialización del componente: obtiene datos de la película y estado en watchlist
     protected override async Task OnInitializedAsync()
     {
-        Movie = await TmdbService.GetMovieDetailAsync(TmdbId);
-        IsInWatchlist = await WatchlistService.IsInWatchlistAsync(TmdbId);
+        Movie = await TmdbService.GetMovieDetailAsync(TmdbId);  // Obtiene los detalles de TMDB
+        IsInWatchlist = await WatchlistService.IsInWatchlistAsync(TmdbId);  // Comprueba si está en la lista
 
         if (IsInWatchlist)
         {
+            // Obtiene información adicional (favorito, visto) de la película en la lista
             var items = await WatchlistService.GetAllAsync();
             var item = items.FirstOrDefault(w => w.TmdbId == TmdbId);
             if (item is not null)
@@ -171,9 +180,10 @@ else
             }
         }
 
-        IsLoading = false;
+        IsLoading = false;  // Finaliza el estado de carga
     }
 
+    // Método para agregar la película a la lista de seguimiento
     private async Task AddToWatchlist()
     {
         if (Movie is null) return;
@@ -193,6 +203,7 @@ else
         await MostrarToast("✅ Agregada a tu lista");
     }
 
+    // Método para alternar el estado de favorito
     private async Task ToggleFavorite()
     {
         await WatchlistService.ToggleFavoriteAsync(TmdbId);
@@ -200,6 +211,7 @@ else
         await MostrarToast(IsFavorite ? "❤️ Agregada a favoritos" : "💔 Quitada de favoritos");
     }
 
+    // Método para alternar el estado de visto/pendiente
     private async Task ToggleWatched()
     {
         await WatchlistService.ToggleWatchedAsync(TmdbId);
@@ -207,12 +219,13 @@ else
         await MostrarToast(IsWatched ? "👁️ Marcada como vista" : "↩️ Marcada como pendiente");
     }
 
+    // Método para mostrar un mensaje tipo toast temporal
     private async Task MostrarToast(string mensaje)
     {
         ToastMessage = mensaje;
         ShowingToast = true;
-        StateHasChanged();
-        await Task.Delay(3000);
+        StateHasChanged();  // Fuerza actualización del UI
+        await Task.Delay(3000);  // Muestra el toast por 3 segundos
         ShowingToast = false;
         StateHasChanged();
     }
