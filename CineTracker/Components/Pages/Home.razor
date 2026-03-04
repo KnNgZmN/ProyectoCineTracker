@@ -2,33 +2,39 @@
 @using CineTracker.Models
 @using CineTracker.Services
 @using CineTracker.Components.Shared
-@inject TmdbService TmdbService
-@inject NavigationManager Navigation
-@rendermode InteractiveServer
+@inject TmdbService TmdbService       // Servicio para consumir la API de TMDB
+@inject NavigationManager Navigation // Servicio para navegar entre páginas
+@rendermode InteractiveServer        // Habilita la interacción con Blazor Server
 
 <PageTitle>CineTracker — Inicio</PageTitle>
 
-<!-- HERO -->
+<!-- =========================
+     HERO: Sección principal de bienvenida con buscador
+     ========================= -->
 <div class="hero">
     <h1 class="hero-title">Descubre tu próxima <span>película favorita</span></h1>
     <p class="hero-subtitle">Explora miles de películas, guarda tu lista y lleva el control de lo que has visto</p>
 
+    <!-- BUSCADOR -->
     <div class="search-container">
         <input class="search-input"
                type="text"
                placeholder="Buscar películas..."
-               @bind="SearchQuery"
+               @bind="SearchQuery"           
                @onkeypress="OnKeyPress" />
         <button class="search-btn" @onclick="Search">🔍</button>
     </div>
 </div>
 
-<!-- PELÍCULAS POPULARES -->
+<!-- =========================
+     SECCIÓN DE PELÍCULAS POPULARES
+     ========================= -->
 <div class="section">
     <h2 class="section-title">🔥 Populares ahora</h2>
 
     @if (IsLoading)
     {
+        <!-- Mostramos un spinner mientras se cargan los datos -->
         <div class="loading-container">
             <div class="spinner"></div>
             <span class="loading-text">Cargando películas...</span>
@@ -36,6 +42,7 @@
     }
     else if (PopularMovies.Any())
     {
+        <!-- Grid de películas usando el componente MovieCard -->
         <div class="movies-grid">
             @foreach (var movie in PopularMovies)
             {
@@ -45,18 +52,22 @@
     }
 </div>
 
-<!-- MEJOR VALORADAS -->
+<!-- =========================
+     SECCIÓN DE MEJOR VALORADAS
+     ========================= -->
 <div class="section">
     <h2 class="section-title">⭐ Mejor valoradas</h2>
 
     @if (IsLoadingTop)
     {
+        <!-- Spinner de carga mientras se obtiene la lista de top-rated -->
         <div class="loading-container">
             <div class="spinner"></div>
         </div>
     }
     else if (TopRatedMovies.Any())
     {
+        <!-- Grid de películas mejor valoradas -->
         <div class="movies-grid">
             @foreach (var movie in TopRatedMovies)
             {
@@ -66,46 +77,69 @@
     }
 </div>
 
-<!-- TOAST -->
+<!-- =========================
+     TOAST: Notificación al agregar película
+     ========================= -->
 @if (ShowingToast)
 {
     <div class="toast">✅ Película agregada a tu lista</div>
 }
 
 @code {
-    private List<TmdbMovie> PopularMovies = new();
-    private List<TmdbMovie> TopRatedMovies = new();
-    private string SearchQuery = string.Empty;
-    private bool IsLoading = true;
-    private bool IsLoadingTop = true;
-    private bool ShowingToast = false;
+    // =========================
+    // VARIABLES DE ESTADO
+    // =========================
+    private List<TmdbMovie> PopularMovies = new();  // Lista de películas populares
+    private List<TmdbMovie> TopRatedMovies = new(); // Lista de películas mejor valoradas
+    private string SearchQuery = string.Empty;      // Valor actual del input de búsqueda
+    private bool IsLoading = true;                  // Indica si las películas populares se están cargando
+    private bool IsLoadingTop = true;               // Indica si las películas top-rated se están cargando
+    private bool ShowingToast = false;              // Estado para mostrar la notificación
 
+    // =========================
+    // MÉTODO ONINITIALIZED: Se ejecuta al iniciar la página
+    // =========================
     protected override async Task OnInitializedAsync()
     {
+        // Obtener películas populares desde la API TMDB
         PopularMovies = await TmdbService.GetPopularMoviesAsync();
-        IsLoading = false;
+        IsLoading = false; // Se termina de cargar la sección
 
+        // Obtener películas mejor valoradas
         TopRatedMovies = await TmdbService.GetTopRatedMoviesAsync();
         IsLoadingTop = false;
     }
 
+    // =========================
+    // MÉTODO DE BÚSQUEDA
+    // =========================
     private void Search()
     {
         if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            // Redirige a la página de búsqueda pasando el query como parámetro
             Navigation.NavigateTo($"/buscar?q={Uri.EscapeDataString(SearchQuery)}");
+        }
     }
 
+    // =========================
+    // DETECTAR TECLA ENTER EN INPUT
+    // =========================
     private void OnKeyPress(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") Search();
     }
 
+    // =========================
+    // MOSTRAR TOAST
+    // =========================
     private async Task ShowToast()
     {
-        ShowingToast = true;
-        StateHasChanged();
-        await Task.Delay(3000);
-        ShowingToast = false;
+        ShowingToast = true;   // Activar notificación
+        StateHasChanged();     // Forzar renderizado
+
+        await Task.Delay(3000); // Duración de la notificación
+        ShowingToast = false;  // Ocultar notificación
         StateHasChanged();
     }
 }

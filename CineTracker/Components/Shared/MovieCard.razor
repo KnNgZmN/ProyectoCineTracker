@@ -1,12 +1,14 @@
 ﻿@using CineTracker.Models
 @using CineTracker.Services
-@inject TmdbService TmdbService
-@inject WatchlistService WatchlistService
-@inject NavigationManager Navigation
+@inject TmdbService TmdbService          // Servicio para obtener URLs de imágenes de TMDB -->
+@inject WatchlistService WatchlistService  // Servicio para manejar la lista de seguimiento -->
+@inject NavigationManager Navigation      // Servicio para navegación entre páginas -->
 
+<!-- Tarjeta de película interactiva -->
 <div class="movie-card" @onclick="GoToDetail">
     @if (!string.IsNullOrEmpty(Movie.PosterPath))
     {
+        <!-- Imagen del poster de la película -->
         <img class="movie-poster"
              src="@TmdbService.GetImageUrl(Movie.PosterPath)"
              alt="@Movie.Title"
@@ -14,23 +16,32 @@
     }
     else
     {
+        <!-- Placeholder si no hay poster disponible -->
         <div class="movie-poster-placeholder">🎬</div>
     }
 
+    <!-- Cuerpo de la tarjeta: título y metadatos -->
     <div class="movie-card-body">
+        <!-- Título de la película con tooltip completo -->
         <div class="movie-card-title" title="@Movie.Title">@Movie.Title</div>
+
+        <!-- Metadatos: calificación y año de estreno -->
         <div class="movie-card-meta">
             <span class="movie-rating">⭐ @Movie.VoteAverage.ToString("F1")</span>
             <span class="movie-year">@GetYear()</span>
         </div>
     </div>
 
+    <!-- Overlay con botones de acción (solo visible al hover) -->
     <div class="movie-card-overlay">
         <div class="overlay-buttons">
+            <!-- Botón para agregar a Mi Lista -->
             <button class="btn-overlay btn-add" @onclick:stopPropagation="true"
                     @onclick="AddToWatchlist">
                 @(IsAdded ? "✅ Agregada" : "+ Mi Lista")
             </button>
+
+            <!-- Botón para ir al detalle de la película -->
             <button class="btn-overlay btn-detail" @onclick:stopPropagation="true"
                     @onclick="GoToDetail">
                 Ver más
@@ -40,30 +51,38 @@
 </div>
 
 @code {
-    [Parameter] public TmdbMovie Movie { get; set; } = default!;
-    [Parameter] public EventCallback OnAdded { get; set; }
+    // Parámetros recibidos desde el padre
+    [Parameter] public TmdbMovie Movie { get; set; } = default!;  // Datos de la película
+    [Parameter] public EventCallback OnAdded { get; set; }        // Evento opcional cuando se agrega a la lista
 
-    private bool IsAdded = false;
+    // Estado interno
+    private bool IsAdded = false;  // Indica si la película ya está en la watchlist
 
+    // Inicialización: verifica si la película ya está en la watchlist
     protected override async Task OnInitializedAsync()
     {
         IsAdded = await WatchlistService.IsInWatchlistAsync(Movie.Id);
     }
 
+    // Método auxiliar para obtener el año de estreno
     private string GetYear()
     {
         if (string.IsNullOrEmpty(Movie.ReleaseDate)) return "N/A";
         return Movie.ReleaseDate.Length >= 4 ? Movie.ReleaseDate[..4] : "N/A";
     }
 
+    // Agrega la película a la lista de seguimiento
     private async Task AddToWatchlist()
     {
-        if (IsAdded) return;
+        if (IsAdded) return;  // Evita agregar más de una vez
         await WatchlistService.AddToWatchlistAsync(Movie);
         IsAdded = true;
+
+        // Invoca un callback opcional para notificar al componente padre
         await OnAdded.InvokeAsync();
     }
 
+    // Navega a la página de detalle de la película
     private void GoToDetail()
     {
         Navigation.NavigateTo($"/pelicula/{Movie.Id}");

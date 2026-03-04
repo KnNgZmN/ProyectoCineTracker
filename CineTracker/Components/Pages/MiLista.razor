@@ -8,6 +8,9 @@
 
 <PageTitle>CineTracker — Mi Lista</PageTitle>
 
+<!-- ================================
+     HEADER: Información general de la lista
+================================ -->
 <div class="section">
     <h1 class="hero-title" style="font-size:2rem; margin-bottom:8px;">
         📋 Mi <span style="color:var(--primary)">Lista</span>
@@ -16,7 +19,9 @@
         @TotalPeliculas película(s) guardada(s) · @TotalVistas vista(s) · @TotalFavoritos favorito(s)
     </p>
 
-    <!-- TABS -->
+    <!-- ================================
+         TABS: Filtrado de la lista
+    ================================= -->
     <div class="tabs">
         <button class="tab-btn @(ActiveTab == "todas" ? "active" : "")"
                 @onclick='() => SetTab("todas")'>
@@ -36,8 +41,12 @@
         </button>
     </div>
 
+    <!-- ================================
+         ESTADOS DE LA LISTA
+    ================================= -->
     @if (IsLoading)
     {
+        <!-- Spinner de carga mientras se obtiene la lista -->
         <div class="loading-container">
             <div class="spinner"></div>
             <span class="loading-text">Cargando tu lista...</span>
@@ -45,6 +54,7 @@
     }
     else if (!MoviesFiltradas.Any())
     {
+        <!-- Estado vacío de la lista -->
         <div class="empty-state">
             <div class="empty-state-icon">🎬</div>
             <div class="empty-state-title">
@@ -52,11 +62,12 @@
             </div>
             <p style="margin-bottom:20px;">
                 @(ActiveTab == "todas"
-                    ? "Empieza a agregar películas desde el inicio o búsqueda"
-                    : "No tienes películas en esta categoría")
+                            ? "Empieza a agregar películas desde el inicio o búsqueda"
+                            : "No tienes películas en esta categoría")
             </p>
             @if (ActiveTab == "todas")
             {
+                <!-- Botón para navegar a la página principal -->
                 <button class="btn btn-primary"
                         @onclick='() => Navigation.NavigateTo("/")'>
                     Explorar películas
@@ -66,26 +77,29 @@
     }
     else
     {
+        <!-- ================================
+             LISTADO DE PELÍCULAS FILTRADAS
+        ================================= -->
         <div style="display:flex; flex-direction:column; gap:12px;">
             @foreach (var item in MoviesFiltradas)
             {
                 <div style="display:flex; gap:16px; background:var(--bg-card);
-                            border-radius:var(--radius); padding:16px;
-                            border:1px solid var(--border); align-items:center;
-                            transition:var(--transition);">
+                                    border-radius:var(--radius); padding:16px;
+                                    border:1px solid var(--border); align-items:center;
+                                    transition:var(--transition);">
 
                     <!-- POSTER -->
                     <img src="@TmdbService.GetImageUrl(item.PosterPath)"
                          style="width:60px; height:90px; object-fit:cover;
-                                border-radius:6px; cursor:pointer; flex-shrink:0;"
+                                        border-radius:6px; cursor:pointer; flex-shrink:0;"
                          alt="@item.Title"
                          @onclick="@(() => Navigation.NavigateTo($"/pelicula/{item.TmdbId}"))" />
 
-                    <!-- INFO -->
+                    <!-- INFORMACIÓN DE LA PELÍCULA -->
                     <div style="flex:1; min-width:0;">
                         <h3 style="font-size:1rem; font-weight:700; margin-bottom:4px;
-                                   cursor:pointer; white-space:nowrap; overflow:hidden;
-                                   text-overflow:ellipsis;"
+                                           cursor:pointer; white-space:nowrap; overflow:hidden;
+                                           text-overflow:ellipsis;"
                             @onclick="@(() => Navigation.NavigateTo($"/pelicula/{item.TmdbId}"))">
                             @item.Title
                         </h3>
@@ -139,30 +153,78 @@
     }
 </div>
 
-<!-- TOAST -->
+<!-- ================================
+     TOAST: Mensaje temporal de acción
+================================ -->
 @if (ShowingToast)
 {
     <div class="toast">@ToastMessage</div>
 }
 
 @code {
+
+    /// <summary>
+    /// Lista completa de películas guardadas por el usuario
+    /// </summary>
     private List<WatchListItem> TodasLasPeliculas = new();
+
+    /// <summary>
+    /// Lista filtrada según el tab activo (todas, pendientes, vistas, favoritos)
+    /// </summary>
     private List<WatchListItem> MoviesFiltradas = new();
+
+    /// <summary>
+    /// Tab activo actualmente
+    /// </summary>
     private string ActiveTab = "todas";
+
+    /// <summary>
+    /// Indica si se está cargando la lista
+    /// </summary>
     private bool IsLoading = true;
+
+    /// <summary>
+    /// Controla si se muestra el toast temporal
+    /// </summary>
     private bool ShowingToast = false;
+
+    /// <summary>
+    /// Mensaje que se muestra en el toast
+    /// </summary>
     private string ToastMessage = string.Empty;
 
+    /// <summary>
+    /// Total de películas guardadas
+    /// </summary>
     private int TotalPeliculas => TodasLasPeliculas.Count;
+
+    /// <summary>
+    /// Total de películas vistas
+    /// </summary>
     private int TotalVistas => TodasLasPeliculas.Count(m => m.IsWatched);
+
+    /// <summary>
+    /// Total de películas pendientes
+    /// </summary>
     private int TotalPendientes => TodasLasPeliculas.Count(m => !m.IsWatched);
+
+    /// <summary>
+    /// Total de películas marcadas como favoritas
+    /// </summary>
     private int TotalFavoritos => TodasLasPeliculas.Count(m => m.IsFavorite);
 
+    /// <summary>
+    /// Inicializa el componente cargando la lista del usuario
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
         await CargarLista();
     }
 
+    /// <summary>
+    /// Carga todas las películas de la lista desde el WatchlistService
+    /// y filtra según el tab activo
+    /// </summary>
     private async Task CargarLista()
     {
         IsLoading = true;
@@ -171,23 +233,34 @@
         IsLoading = false;
     }
 
+    /// <summary>
+    /// Cambia el tab activo y filtra la lista
+    /// </summary>
+    /// <param name="tab">Nombre del tab seleccionado</param>
     private void SetTab(string tab)
     {
         ActiveTab = tab;
         FiltrarPorTab();
     }
 
+    /// <summary>
+    /// Filtra la lista completa según el tab activo
+    /// </summary>
     private void FiltrarPorTab()
     {
         MoviesFiltradas = ActiveTab switch
         {
-            "vistas"     => TodasLasPeliculas.Where(m => m.IsWatched).ToList(),
+            "vistas" => TodasLasPeliculas.Where(m => m.IsWatched).ToList(),
             "pendientes" => TodasLasPeliculas.Where(m => !m.IsWatched).ToList(),
-            "favoritos"  => TodasLasPeliculas.Where(m => m.IsFavorite).ToList(),
-            _            => TodasLasPeliculas.ToList()
+            "favoritos" => TodasLasPeliculas.Where(m => m.IsFavorite).ToList(),
+            _ => TodasLasPeliculas.ToList()
         };
     }
 
+    /// <summary>
+    /// Marca o desmarca una película como vista/pending
+    /// </summary>
+    /// <param name="item">Película seleccionada</param>
     private async Task ToggleWatched(WatchListItem item)
     {
         await WatchlistService.ToggleWatchedAsync(item.TmdbId);
@@ -196,6 +269,10 @@
         await MostrarToast(item.IsWatched ? "👁️ Marcada como vista" : "↩️ Marcada como pendiente");
     }
 
+    /// <summary>
+    /// Marca o desmarca una película como favorita
+    /// </summary>
+    /// <param name="item">Película seleccionada</param>
     private async Task ToggleFavorite(WatchListItem item)
     {
         await WatchlistService.ToggleFavoriteAsync(item.TmdbId);
@@ -204,6 +281,10 @@
         await MostrarToast(item.IsFavorite ? "❤️ Agregada a favoritos" : "💔 Quitada de favoritos");
     }
 
+    /// <summary>
+    /// Elimina una película de la lista del usuario
+    /// </summary>
+    /// <param name="item">Película seleccionada</param>
     private async Task RemoveFromList(WatchListItem item)
     {
         await WatchlistService.RemoveFromWatchlistAsync(item.TmdbId);
@@ -212,6 +293,10 @@
         await MostrarToast("🗑️ Película eliminada de tu lista");
     }
 
+    /// <summary>
+    /// Muestra un toast temporal con un mensaje
+    /// </summary>
+    /// <param name="mensaje">Texto a mostrar en el toast</param>
     private async Task MostrarToast(string mensaje)
     {
         ToastMessage = mensaje;

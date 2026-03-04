@@ -8,22 +8,28 @@
 
 <PageTitle>CineTracker — Buscar</PageTitle>
 
-<!-- HEADER -->
+<!-- ================================
+     HEADER: Búsqueda de películas
+================================ -->
 <div class="hero" style="padding: 40px;">
     <h1 class="hero-title" style="font-size:2rem">🔍 Buscar <span>Películas</span></h1>
     <div class="search-container" style="margin-top:20px">
+        <!-- Input de búsqueda -->
         <input class="search-input"
                type="text"
                placeholder="Escribe el nombre de una película..."
                @bind="SearchQuery"
                @onkeypress="OnKeyPress" />
+        <!-- Botón para iniciar búsqueda -->
         <button class="search-btn" @onclick="Search">Buscar</button>
     </div>
 </div>
 
 <div class="section">
 
-    <!-- TABS -->
+    <!-- ================================
+         TABS: Listado de películas por categoría
+    ================================= -->
     @if (string.IsNullOrWhiteSpace(SearchQuery) || !HasSearched)
     {
         <div class="tabs">
@@ -42,7 +48,9 @@
         </div>
     }
 
-    <!-- RESULTADOS DE BÚSQUEDA -->
+    <!-- ================================
+         RESULTADOS DE BÚSQUEDA
+    ================================= -->
     @if (HasSearched)
     {
         <h2 class="section-title">
@@ -51,6 +59,7 @@
 
         @if (IsLoading)
         {
+            <!-- Estado de carga -->
             <div class="loading-container">
                 <div class="spinner"></div>
                 <span class="loading-text">Buscando...</span>
@@ -58,6 +67,7 @@
         }
         else if (!SearchResults.Any())
         {
+            <!-- No hay resultados -->
             <div class="empty-state">
                 <div class="empty-state-icon">🎬</div>
                 <div class="empty-state-title">Sin resultados</div>
@@ -66,12 +76,14 @@
         }
         else
         {
+            <!-- Mostrar resultados -->
             <p style="color:var(--text-secondary); margin-bottom:20px">
                 @SearchResults.Count resultado(s) encontrado(s)
             </p>
             <div class="movies-grid">
                 @foreach (var movie in SearchResults)
                 {
+                    <!-- Componente MovieCard reutilizable -->
                     <MovieCard Movie="movie" OnAdded="ShowToast" />
                 }
             </div>
@@ -79,9 +91,12 @@
     }
     else
     {
-        <!-- LISTADOS POR TAB -->
+        <!-- ================================
+             LISTADOS POR TAB
+        ================================= -->
         @if (IsLoading)
         {
+            <!-- Estado de carga -->
             <div class="loading-container">
                 <div class="spinner"></div>
                 <span class="loading-text">Cargando...</span>
@@ -99,25 +114,68 @@
     }
 </div>
 
-<!-- TOAST -->
+<!-- ================================
+     TOAST: Mensaje de confirmación
+================================ -->
 @if (ShowingToast)
 {
     <div class="toast">✅ Película agregada a tu lista</div>
 }
 
 @code {
+
+    /// <summary>
+    /// Parámetro opcional recibido desde la query string (?q=)
+    /// Permite prellenar la búsqueda al cargar la página
+    /// </summary>
     [SupplyParameterFromQuery(Name = "q")]
     private string? QueryParam { get; set; }
 
+    /// <summary>
+    /// Texto actual del input de búsqueda
+    /// </summary>
     private string SearchQuery = string.Empty;
+
+    /// <summary>
+    /// Última búsqueda realizada
+    /// </summary>
     private string LastQuery = string.Empty;
+
+    /// <summary>
+    /// Tab activo ("popular", "toprated", "nowplaying")
+    /// </summary>
     private string ActiveTab = "popular";
+
+    /// <summary>
+    /// Resultados obtenidos de la búsqueda en TMDB
+    /// </summary>
     private List<TmdbMovie> SearchResults = new();
+
+    /// <summary>
+    /// Listado de películas por tab (populares, top rated, now playing)
+    /// </summary>
     private List<TmdbMovie> TabMovies = new();
+
+    /// <summary>
+    /// Indica si se está cargando datos (mostrar spinner)
+    /// </summary>
     private bool IsLoading = false;
+
+    /// <summary>
+    /// Indica si se realizó una búsqueda
+    /// </summary>
     private bool HasSearched = false;
+
+    /// <summary>
+    /// Controla la visualización del toast de confirmación
+    /// </summary>
     private bool ShowingToast = false;
 
+    /// <summary>
+    /// Inicializa el componente:
+    /// - Si hay query string, realiza la búsqueda automática
+    /// - Si no, carga el tab por defecto ("popular")
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
         if (!string.IsNullOrWhiteSpace(QueryParam))
@@ -131,6 +189,10 @@
         }
     }
 
+    /// <summary>
+    /// Cambia el tab activo y carga su listado
+    /// </summary>
+    /// <param name="tab">Nombre del tab</param>
     private async Task SetTab(string tab)
     {
         ActiveTab = tab;
@@ -139,9 +201,15 @@
         await LoadTab(tab);
     }
 
+    /// <summary>
+    /// Carga las películas de la categoría especificada desde TMDB
+    /// </summary>
+    /// <param name="tab">Categoría: "popular", "toprated", "nowplaying"</param>
     private async Task LoadTab(string tab)
     {
         IsLoading = true;
+
+        // Llamadas al servicio TMDB según el tab activo
         TabMovies = tab switch
         {
             "popular" => await TmdbService.GetPopularMoviesAsync(),
@@ -149,24 +217,39 @@
             "nowplaying" => await TmdbService.GetNowPlayingAsync(),
             _ => new List<TmdbMovie>()
         };
+
         IsLoading = false;
     }
 
+    /// <summary>
+    /// Realiza la búsqueda de películas en TMDB
+    /// </summary>
     private async Task Search()
     {
         if (string.IsNullOrWhiteSpace(SearchQuery)) return;
+
         IsLoading = true;
         HasSearched = true;
         LastQuery = SearchQuery;
+
+        // Consumir TMDB API para buscar películas
         SearchResults = await TmdbService.SearchMoviesAsync(SearchQuery);
+
         IsLoading = false;
     }
 
+    /// <summary>
+    /// Detecta la tecla Enter para iniciar búsqueda
+    /// </summary>
+    /// <param name="e">Evento del teclado</param>
     private void OnKeyPress(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") _ = Search();
     }
 
+    /// <summary>
+    /// Muestra un toast temporal indicando que la película fue agregada
+    /// </summary>
     private async Task ShowToast()
     {
         ShowingToast = true;
