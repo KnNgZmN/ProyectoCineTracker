@@ -1,9 +1,18 @@
+using CineTracker;
 using CineTracker.Components;
 using CineTracker.Data;
-using Microsoft.EntityFrameworkCore;
 using CineTracker.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: false)
+    .AddUserSecrets<Program>(optional: true)
+    .AddEnvironmentVariables();
+
+builder.Services.Configure<TmdbSettings>(
+    builder.Configuration.GetSection("TmdbSettings"));
 
 // Base de datos: usar una fábrica de DbContext para evitar operaciones concurrentes en Blazor Server
 builder.Services.AddDbContextFactory<CineTrackerContext>(options =>

@@ -1,5 +1,6 @@
-﻿using System.Text.Json;
-using CineTracker.Models;
+﻿using CineTracker.Models;
+using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace CineTracker.Services
 {
@@ -9,14 +10,17 @@ namespace CineTracker.Services
         private readonly string _apiKey;
         private readonly string _baseUrl;
         private readonly string _imageBaseUrl;
+        private readonly TmdbSettings _settings;
 
-        public TmdbService(HttpClient httpClient, IConfiguration configuration)
+        public TmdbService(HttpClient httpClient, IOptions<TmdbSettings> options)
         {
             _httpClient = httpClient;
-            _apiKey = configuration["TmdbSettings:ApiKey"]!;
-            _baseUrl = configuration["TmdbSettings:BaseUrl"]!;
-            _imageBaseUrl = configuration["TmdbSettings:ImageBaseUrl"]!;
-        }
+            _settings = options.Value;
+
+            _apiKey = _settings.ApiKey;
+            _baseUrl = _settings.BaseUrl;
+            _imageBaseUrl = _settings.ImageBaseUrl;
+        }      
 
         // Obtener URL completa de imagen
         public string GetImageUrl(string posterPath)
