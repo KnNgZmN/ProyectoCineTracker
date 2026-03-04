@@ -1,0 +1,219 @@
+﻿@page "/pelicula/{TmdbId:int}"
+@using CineTracker.Models
+@using CineTracker.Services
+@inject TmdbService TmdbService
+@inject WatchlistService WatchlistService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>@(Movie?.Title ?? "Cargando...") — CineTracker</PageTitle>
+
+@if (IsLoading)
+{
+    <div class="loading-container" style="height:80vh">
+        <div class="spinner"></div>
+        <span class="loading-text">Cargando película...</span>
+    </div>
+}
+else if (Movie is null)
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">❌</div>
+        <div class="empty-state-title">Película no encontrada</div>
+        <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/")'>
+            Volver al inicio
+        </button>
+    </div>
+}
+else
+{
+    <!-- BACKDROP -->
+    @if (!string.IsNullOrEmpty(Movie.BackdropPath))
+    {
+        <div style="position:relative; height:400px; overflow:hidden;">
+            <img src="https://image.tmdb.org/t/p/w1280@(Movie.BackdropPath)"
+                 style="width:100%; height:100%; object-fit:cover; filter:brightness(0.4);"
+                 alt="@Movie.Title" />
+            <div style="position:absolute; inset:0; background:linear-gradient(transparent 30%, var(--bg-dark) 100%);"></div>
+        </div>
+    }
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="section" style="margin-top: @(string.IsNullOrEmpty(Movie.BackdropPath) ? "20px" : "-180px"); position:relative; z-index:1;">
+        <div style="display:flex; gap:32px; flex-wrap:wrap;">
+
+            <!-- POSTER -->
+            <div style="flex-shrink:0;">
+                @if (!string.IsNullOrEmpty(Movie.PosterPath))
+                {
+                    <img src="@TmdbService.GetImageUrl(Movie.PosterPath)"
+                         style="width:220px; border-radius:12px; box-shadow:0 20px 40px rgba(0,0,0,0.6);"
+                         alt="@Movie.Title" />
+                }
+            </div>
+
+            <!-- INFO -->
+            <div style="flex:1; min-width:280px;">
+
+                <h1 style="font-size:2.2rem; font-weight:900; margin-bottom:8px;">@Movie.Title</h1>
+
+                @if (!string.IsNullOrEmpty(Movie.Tagline))
+                {
+                    <p style="color:var(--text-secondary); font-style:italic; margin-bottom:16px;">
+                        "@Movie.Tagline"
+                    </p>
+                }
+
+                <!-- METADATA -->
+                <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
+                    <span style="color:#f5c518; font-weight:700; font-size:1.1rem;">
+                        ⭐ @Movie.VoteAverage.ToString("F1")
+                    </span>
+                    @if (!string.IsNullOrEmpty(Movie.ReleaseDate))
+                    {
+                        <span style="color:var(--text-secondary);">
+                            📅 @Movie.ReleaseDate[..4]
+                        </span>
+                    }
+                    @if (Movie.Runtime > 0)
+                    {
+                        <span style="color:var(--text-secondary);">
+                            ⏱️ @($"{Movie.Runtime / 60}h {Movie.Runtime % 60}min")
+                        </span>
+                    }
+                </div>
+
+                <!-- GÉNEROS -->
+                @if (Movie.Genres.Any())
+                {
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
+                        @foreach (var genre in Movie.Genres)
+                        {
+                            <span class="badge" style="background:rgba(229,9,20,0.2); color:var(--primary);">
+                                @genre.Name
+                            </span>
+                        }
+                    </div>
+                }
+
+                <!-- SINOPSIS -->
+                <h3 style="margin-bottom:8px; color:var(--text-secondary); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">
+                    Sinopsis
+                </h3>
+                <p style="color:var(--text-primary); line-height:1.7; margin-bottom:28px; max-width:600px;">
+                    @(string.IsNullOrEmpty(Movie.Overview) ? "Sin sinopsis disponible." : Movie.Overview)
+                </p>
+
+                <!-- BOTONES DE ACCIÓN -->
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    @if (!IsInWatchlist)
+                    {
+                        <button class="btn btn-primary" @onclick="AddToWatchlist">
+                            + Agregar a Mi Lista
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-secondary" disabled>
+                            ✅ En tu lista
+                        </button>
+                        <button class="btn @(IsWatched ? "btn-secondary" : "btn-primary")"
+                                @onclick="ToggleWatched">
+                            @(IsWatched ? "↩️ Marcar pendiente" : "👁️ Marcar como vista")
+                        </button>
+                        <button class="btn @(IsFavorite ? "btn-danger" : "btn-secondary")"
+                                @onclick="ToggleFavorite">
+                            @(IsFavorite ? "💔 Quitar favorito" : "❤️ Favorito")
+                        </button>
+                    }
+                    <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/")'>
+                        ← Volver
+                    </button>
+                </div>
+
+                <!-- TOAST -->
+                @if (ShowingToast)
+                {
+                    <div style="margin-top:16px; padding:12px 16px; background:rgba(39,174,96,0.2);
+                                        border-left:3px solid #27ae60; border-radius:var(--radius); color:#27ae60;">
+                        @ToastMessage
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int TmdbId { get; set; }
+
+    private TmdbMovieDetail? Movie;
+    private bool IsLoading = true;
+    private bool IsInWatchlist = false;
+    private bool IsFavorite = false;
+    private bool IsWatched = false;
+    private bool ShowingToast = false;
+    private string ToastMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Movie = await TmdbService.GetMovieDetailAsync(TmdbId);
+        IsInWatchlist = await WatchlistService.IsInWatchlistAsync(TmdbId);
+
+        if (IsInWatchlist)
+        {
+            var items = await WatchlistService.GetAllAsync();
+            var item = items.FirstOrDefault(w => w.TmdbId == TmdbId);
+            if (item is not null)
+            {
+                IsFavorite = item.IsFavorite;
+                IsWatched = item.IsWatched;
+            }
+        }
+
+        IsLoading = false;
+    }
+
+    private async Task AddToWatchlist()
+    {
+        if (Movie is null) return;
+
+        var tmdbMovie = new TmdbMovie
+        {
+            Id = Movie.Id,
+            Title = Movie.Title,
+            Overview = Movie.Overview,
+            PosterPath = Movie.PosterPath,
+            ReleaseDate = Movie.ReleaseDate,
+            VoteAverage = Movie.VoteAverage
+        };
+
+        await WatchlistService.AddToWatchlistAsync(tmdbMovie);
+        IsInWatchlist = true;
+        await MostrarToast("✅ Agregada a tu lista");
+    }
+
+    private async Task ToggleFavorite()
+    {
+        await WatchlistService.ToggleFavoriteAsync(TmdbId);
+        IsFavorite = !IsFavorite;
+        await MostrarToast(IsFavorite ? "❤️ Agregada a favoritos" : "💔 Quitada de favoritos");
+    }
+
+    private async Task ToggleWatched()
+    {
+        await WatchlistService.ToggleWatchedAsync(TmdbId);
+        IsWatched = !IsWatched;
+        await MostrarToast(IsWatched ? "👁️ Marcada como vista" : "↩️ Marcada como pendiente");
+    }
+
+    private async Task MostrarToast(string mensaje)
+    {
+        ToastMessage = mensaje;
+        ShowingToast = true;
+        StateHasChanged();
+        await Task.Delay(3000);
+        ShowingToast = false;
+        StateHasChanged();
+    }
+}

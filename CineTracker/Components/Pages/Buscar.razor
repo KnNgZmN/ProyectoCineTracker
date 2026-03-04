@@ -1,0 +1,178 @@
+﻿@page "/buscar"
+@using CineTracker.Models
+@using CineTracker.Services
+@using CineTracker.Components.Shared
+@inject TmdbService TmdbService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>CineTracker — Buscar</PageTitle>
+
+<!-- HEADER -->
+<div class="hero" style="padding: 40px;">
+    <h1 class="hero-title" style="font-size:2rem">🔍 Buscar <span>Películas</span></h1>
+    <div class="search-container" style="margin-top:20px">
+        <input class="search-input"
+               type="text"
+               placeholder="Escribe el nombre de una película..."
+               @bind="SearchQuery"
+               @onkeypress="OnKeyPress" />
+        <button class="search-btn" @onclick="Search">Buscar</button>
+    </div>
+</div>
+
+<div class="section">
+
+    <!-- TABS -->
+    @if (string.IsNullOrWhiteSpace(SearchQuery) || !HasSearched)
+    {
+        <div class="tabs">
+            <button class="tab-btn @(ActiveTab == "popular" ? "active" : "")"
+                    @onclick='() => SetTab("popular")'>
+                🔥 Populares
+            </button>
+            <button class="tab-btn @(ActiveTab == "toprated" ? "active" : "")"
+                    @onclick='() => SetTab("toprated")'>
+                ⭐ Mejor Valoradas
+            </button>
+            <button class="tab-btn @(ActiveTab == "nowplaying" ? "active" : "")"
+                    @onclick='() => SetTab("nowplaying")'>
+                🎭 En Cartelera
+            </button>
+        </div>
+    }
+
+    <!-- RESULTADOS DE BÚSQUEDA -->
+    @if (HasSearched)
+    {
+        <h2 class="section-title">
+            Resultados para: <span style="color:var(--primary)">"@LastQuery"</span>
+        </h2>
+
+        @if (IsLoading)
+        {
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <span class="loading-text">Buscando...</span>
+            </div>
+        }
+        else if (!SearchResults.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon">🎬</div>
+                <div class="empty-state-title">Sin resultados</div>
+                <p>No encontramos películas para "@LastQuery"</p>
+            </div>
+        }
+        else
+        {
+            <p style="color:var(--text-secondary); margin-bottom:20px">
+                @SearchResults.Count resultado(s) encontrado(s)
+            </p>
+            <div class="movies-grid">
+                @foreach (var movie in SearchResults)
+                {
+                    <MovieCard Movie="movie" OnAdded="ShowToast" />
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <!-- LISTADOS POR TAB -->
+        @if (IsLoading)
+        {
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <span class="loading-text">Cargando...</span>
+            </div>
+        }
+        else
+        {
+            <div class="movies-grid">
+                @foreach (var movie in TabMovies)
+                {
+                    <MovieCard Movie="movie" OnAdded="ShowToast" />
+                }
+            </div>
+        }
+    }
+</div>
+
+<!-- TOAST -->
+@if (ShowingToast)
+{
+    <div class="toast">✅ Película agregada a tu lista</div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")]
+    private string? QueryParam { get; set; }
+
+    private string SearchQuery = string.Empty;
+    private string LastQuery = string.Empty;
+    private string ActiveTab = "popular";
+    private List<TmdbMovie> SearchResults = new();
+    private List<TmdbMovie> TabMovies = new();
+    private bool IsLoading = false;
+    private bool HasSearched = false;
+    private bool ShowingToast = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(QueryParam))
+        {
+            SearchQuery = QueryParam;
+            await Search();
+        }
+        else
+        {
+            await LoadTab("popular");
+        }
+    }
+
+    private async Task SetTab(string tab)
+    {
+        ActiveTab = tab;
+        HasSearched = false;
+        SearchQuery = string.Empty;
+        await LoadTab(tab);
+    }
+
+    private async Task LoadTab(string tab)
+    {
+        IsLoading = true;
+        TabMovies = tab switch
+        {
+            "popular" => await TmdbService.GetPopularMoviesAsync(),
+            "toprated" => await TmdbService.GetTopRatedMoviesAsync(),
+            "nowplaying" => await TmdbService.GetNowPlayingAsync(),
+            _ => new List<TmdbMovie>()
+        };
+        IsLoading = false;
+    }
+
+    private async Task Search()
+    {
+        if (string.IsNullOrWhiteSpace(SearchQuery)) return;
+        IsLoading = true;
+        HasSearched = true;
+        LastQuery = SearchQuery;
+        SearchResults = await TmdbService.SearchMoviesAsync(SearchQuery);
+        IsLoading = false;
+    }
+
+    private void OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") _ = Search();
+    }
+
+    private async Task ShowToast()
+    {
+        ShowingToast = true;
+        StateHasChanged();
+        await Task.Delay(3000);
+        ShowingToast = false;
+        StateHasChanged();
+    }
+}

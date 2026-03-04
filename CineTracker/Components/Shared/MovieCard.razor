@@ -1,0 +1,71 @@
+﻿@using CineTracker.Models
+@using CineTracker.Services
+@inject TmdbService TmdbService
+@inject WatchlistService WatchlistService
+@inject NavigationManager Navigation
+
+<div class="movie-card" @onclick="GoToDetail">
+    @if (!string.IsNullOrEmpty(Movie.PosterPath))
+    {
+        <img class="movie-poster"
+             src="@TmdbService.GetImageUrl(Movie.PosterPath)"
+             alt="@Movie.Title"
+             loading="lazy" />
+    }
+    else
+    {
+        <div class="movie-poster-placeholder">🎬</div>
+    }
+
+    <div class="movie-card-body">
+        <div class="movie-card-title" title="@Movie.Title">@Movie.Title</div>
+        <div class="movie-card-meta">
+            <span class="movie-rating">⭐ @Movie.VoteAverage.ToString("F1")</span>
+            <span class="movie-year">@GetYear()</span>
+        </div>
+    </div>
+
+    <div class="movie-card-overlay">
+        <div class="overlay-buttons">
+            <button class="btn-overlay btn-add" @onclick:stopPropagation="true"
+                    @onclick="AddToWatchlist">
+                @(IsAdded ? "✅ Agregada" : "+ Mi Lista")
+            </button>
+            <button class="btn-overlay btn-detail" @onclick:stopPropagation="true"
+                    @onclick="GoToDetail">
+                Ver más
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public TmdbMovie Movie { get; set; } = default!;
+    [Parameter] public EventCallback OnAdded { get; set; }
+
+    private bool IsAdded = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsAdded = await WatchlistService.IsInWatchlistAsync(Movie.Id);
+    }
+
+    private string GetYear()
+    {
+        if (string.IsNullOrEmpty(Movie.ReleaseDate)) return "N/A";
+        return Movie.ReleaseDate.Length >= 4 ? Movie.ReleaseDate[..4] : "N/A";
+    }
+
+    private async Task AddToWatchlist()
+    {
+        if (IsAdded) return;
+        await WatchlistService.AddToWatchlistAsync(Movie);
+        IsAdded = true;
+        await OnAdded.InvokeAsync();
+    }
+
+    private void GoToDetail()
+    {
+        Navigation.NavigateTo($"/pelicula/{Movie.Id}");
+    }
+}

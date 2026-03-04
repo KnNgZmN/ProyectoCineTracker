@@ -1,7 +1,111 @@
 ﻿@page "/"
+@using CineTracker.Models
+@using CineTracker.Services
+@using CineTracker.Components.Shared
+@inject TmdbService TmdbService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+<PageTitle>CineTracker — Inicio</PageTitle>
 
-<h1>Hello, world!</h1>
+<!-- HERO -->
+<div class="hero">
+    <h1 class="hero-title">Descubre tu próxima <span>película favorita</span></h1>
+    <p class="hero-subtitle">Explora miles de películas, guarda tu lista y lleva el control de lo que has visto</p>
 
-Welcome to your new app.
+    <div class="search-container">
+        <input class="search-input"
+               type="text"
+               placeholder="Buscar películas..."
+               @bind="SearchQuery"
+               @onkeypress="OnKeyPress" />
+        <button class="search-btn" @onclick="Search">🔍</button>
+    </div>
+</div>
+
+<!-- PELÍCULAS POPULARES -->
+<div class="section">
+    <h2 class="section-title">🔥 Populares ahora</h2>
+
+    @if (IsLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <span class="loading-text">Cargando películas...</span>
+        </div>
+    }
+    else if (PopularMovies.Any())
+    {
+        <div class="movies-grid">
+            @foreach (var movie in PopularMovies)
+            {
+                <MovieCard Movie="movie" OnAdded="ShowToast" />
+            }
+        </div>
+    }
+</div>
+
+<!-- MEJOR VALORADAS -->
+<div class="section">
+    <h2 class="section-title">⭐ Mejor valoradas</h2>
+
+    @if (IsLoadingTop)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+        </div>
+    }
+    else if (TopRatedMovies.Any())
+    {
+        <div class="movies-grid">
+            @foreach (var movie in TopRatedMovies)
+            {
+                <MovieCard Movie="movie" OnAdded="ShowToast" />
+            }
+        </div>
+    }
+</div>
+
+<!-- TOAST -->
+@if (ShowingToast)
+{
+    <div class="toast">✅ Película agregada a tu lista</div>
+}
+
+@code {
+    private List<TmdbMovie> PopularMovies = new();
+    private List<TmdbMovie> TopRatedMovies = new();
+    private string SearchQuery = string.Empty;
+    private bool IsLoading = true;
+    private bool IsLoadingTop = true;
+    private bool ShowingToast = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PopularMovies = await TmdbService.GetPopularMoviesAsync();
+        IsLoading = false;
+
+        TopRatedMovies = await TmdbService.GetTopRatedMoviesAsync();
+        IsLoadingTop = false;
+    }
+
+    private void Search()
+    {
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+            Navigation.NavigateTo($"/buscar?q={Uri.EscapeDataString(SearchQuery)}");
+    }
+
+    private void OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") Search();
+    }
+
+    private async Task ShowToast()
+    {
+        ShowingToast = true;
+        StateHasChanged();
+        await Task.Delay(3000);
+        ShowingToast = false;
+        StateHasChanged();
+    }
+}
