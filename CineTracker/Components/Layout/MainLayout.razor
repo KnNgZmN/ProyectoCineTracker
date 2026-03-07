@@ -1,11 +1,4 @@
-﻿@inherits LayoutComponentBase
-
-<!--
-    Layout principal de la aplicación CineTracker.
-    Este layout define la estructura común de todas las páginas:
-    - Barra de navegación superior (navbar)
-    - Área principal donde se renderiza el contenido de cada página (@Body)
--->
+@inherits LayoutComponentBase
 
 <div class="layout">
     <!-- ===== NAVBAR ===== -->
@@ -20,12 +13,23 @@
             <a href="/" class="nav-link">🏠 Inicio</a>
             <a href="/buscar" class="nav-link">🔍 Buscar</a>
             <a href="/mi-lista" class="nav-link">📋 Mi Lista</a>
+
+            <!-- Usuario autenticado: muestra nombre y botón de salir -->
+            <AuthorizeView>
+                <Authorized>
+                    <span class="nav-user">👤 @context.User.Identity?.Name</span>
+                    <a href="/logout" class="nav-link nav-logout">Salir</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login" class="nav-link">Iniciar sesión</a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
     </nav>
 
     <!-- ===== CONTENIDO PRINCIPAL ===== -->
     <main>
-        @* Aquí se renderiza el contenido específico de cada página *@
         @Body
     </main>
 </div>
+

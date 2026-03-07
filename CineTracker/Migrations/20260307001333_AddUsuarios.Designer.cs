@@ -4,6 +4,7 @@ using CineTracker.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CineTracker.Migrations
 {
     [DbContext(typeof(CineTrackerContext))]
-    partial class CineTrackerContextModelSnapshot : ModelSnapshot
+    [Migration("20260307001333_AddUsuarios")]
+    partial class AddUsuarios
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -135,28 +138,12 @@ namespace CineTracker.Migrations
                     b.Property<int>("TmdbId")
                         .HasColumnType("int");
 
-                    b.Property<int>("UsuarioId")
-                        .HasColumnType("int");
-
                     b.Property<double>("VoteAverage")
                         .HasColumnType("float");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UsuarioId");
-
                     b.ToTable("WatchlistItems");
-                });
-
-            modelBuilder.Entity("CineTracker.Models.WatchListItem", b =>
-                {
-                    b.HasOne("CineTracker.Models.Usuario", "Usuario")
-                        .WithMany()
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Usuario");
                 });
 #pragma warning restore 612, 618
         }

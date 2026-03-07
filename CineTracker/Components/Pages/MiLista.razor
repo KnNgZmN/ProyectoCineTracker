@@ -1,6 +1,8 @@
 ﻿@page "/mi-lista"
+@attribute [Authorize]
 @using CineTracker.Models
 @using CineTracker.Services
+@using System.Security.Claims
 @inject WatchlistService WatchlistService
 @inject TmdbService TmdbService
 @inject NavigationManager Navigation
@@ -192,6 +194,10 @@
     /// Mensaje que se muestra en el toast
     /// </summary>
     private string ToastMessage = string.Empty;
+    private int? _userId;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
 
     /// <summary>
     /// Total de películas guardadas
@@ -218,17 +224,17 @@
     /// </summary>
     protected override async Task OnInitializedAsync()
     {
+        var auth = await AuthStateTask;
+        var claim = auth.User.FindFirst(ClaimTypes.NameIdentifier);
+        if (claim != null) _userId = int.Parse(claim.Value);
         await CargarLista();
     }
 
-    /// <summary>
-    /// Carga todas las películas de la lista desde el WatchlistService
-    /// y filtra según el tab activo
-    /// </summary>
     private async Task CargarLista()
     {
+        if (!_userId.HasValue) return;
         IsLoading = true;
-        TodasLasPeliculas = await WatchlistService.GetAllAsync();
+        TodasLasPeliculas = await WatchlistService.GetAllAsync(_userId.Value);
         FiltrarPorTab();
         IsLoading = false;
     }
@@ -263,31 +269,26 @@
     /// <param name="item">Película seleccionada</param>
     private async Task ToggleWatched(WatchListItem item)
     {
-        await WatchlistService.ToggleWatchedAsync(item.TmdbId);
+        if (!_userId.HasValue) return;
+        await WatchlistService.ToggleWatchedAsync(item.TmdbId, _userId.Value);
         item.IsWatched = !item.IsWatched;
         FiltrarPorTab();
         await MostrarToast(item.IsWatched ? "👁️ Marcada como vista" : "↩️ Marcada como pendiente");
     }
 
-    /// <summary>
-    /// Marca o desmarca una película como favorita
-    /// </summary>
-    /// <param name="item">Película seleccionada</param>
     private async Task ToggleFavorite(WatchListItem item)
     {
-        await WatchlistService.ToggleFavoriteAsync(item.TmdbId);
+        if (!_userId.HasValue) return;
+        await WatchlistService.ToggleFavoriteAsync(item.TmdbId, _userId.Value);
         item.IsFavorite = !item.IsFavorite;
         FiltrarPorTab();
         await MostrarToast(item.IsFavorite ? "❤️ Agregada a favoritos" : "💔 Quitada de favoritos");
     }
 
-    /// <summary>
-    /// Elimina una película de la lista del usuario
-    /// </summary>
-    /// <param name="item">Película seleccionada</param>
     private async Task RemoveFromList(WatchListItem item)
     {
-        await WatchlistService.RemoveFromWatchlistAsync(item.TmdbId);
+        if (!_userId.HasValue) return;
+        await WatchlistService.RemoveFromWatchlistAsync(item.TmdbId, _userId.Value);
         TodasLasPeliculas.Remove(item);
         FiltrarPorTab();
         await MostrarToast("🗑️ Película eliminada de tu lista");

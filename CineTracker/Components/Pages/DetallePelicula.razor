@@ -1,10 +1,11 @@
-﻿@page "/pelicula/{TmdbId:int}"  // Ruta dinámica: recibe un ID de película de TMDB
+﻿@page "/pelicula/{TmdbId:int}"
 @using CineTracker.Models
 @using CineTracker.Services
-@inject TmdbService TmdbService  // Servicio para obtener detalles de películas desde TMDB
-@inject WatchlistService WatchlistService  //Servicio para gestionar la lista de seguimiento del usuario
-@inject NavigationManager Navigation  // Servicio para navegar entre páginas
-@rendermode InteractiveServer  // Configura el renderizado interactivo en Blazor Server
+@using System.Security.Claims
+@inject TmdbService TmdbService
+@inject WatchlistService WatchlistService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
 
 <!-- Título dinámico de la página -->
 <PageTitle>@(Movie?.Title ?? "Cargando...") — CineTracker</PageTitle>
@@ -109,29 +110,33 @@ else
 
                 <!-- BOTONES DE ACCIÓN -->
                 <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                    @if (!IsInWatchlist)
+                    @if (_userId.HasValue)
                     {
-                        <!-- Botón para agregar la película a la lista de seguimiento -->
-                        <button class="btn btn-primary" @onclick="AddToWatchlist">
-                            + Agregar a Mi Lista
-                        </button>
+                        @if (!IsInWatchlist)
+                        {
+                            <button class="btn btn-primary" @onclick="AddToWatchlist">
+                                + Agregar a Mi Lista
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-secondary" disabled>✅ En tu lista</button>
+                            <button class="btn @(IsWatched ? "btn-secondary" : "btn-primary")"
+                                    @onclick="ToggleWatched">
+                                @(IsWatched ? "↩️ Marcar pendiente" : "👁️ Marcar como vista")
+                            </button>
+                            <button class="btn @(IsFavorite ? "btn-danger" : "btn-secondary")"
+                                    @onclick="ToggleFavorite">
+                                @(IsFavorite ? "💔 Quitar favorito" : "❤️ Favorito")
+                            </button>
+                        }
                     }
                     else
                     {
-                        <!-- Botones para gestionar la película en la lista (vista, favorito) -->
-                        <button class="btn btn-secondary" disabled>
-                            ✅ En tu lista
-                        </button>
-                        <button class="btn @(IsWatched ? "btn-secondary" : "btn-primary")"
-                                @onclick="ToggleWatched">
-                            @(IsWatched ? "↩️ Marcar pendiente" : "👁️ Marcar como vista")
-                        </button>
-                        <button class="btn @(IsFavorite ? "btn-danger" : "btn-secondary")"
-                                @onclick="ToggleFavorite">
-                            @(IsFavorite ? "💔 Quitar favorito" : "❤️ Favorito")
+                        <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/login")'>
+                            🔒 Inicia sesión para guardar
                         </button>
                     }
-                    <!-- Botón de navegación para volver al inicio -->
                     <button class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/")'>
                         ← Volver
                     </button>
@@ -151,9 +156,11 @@ else
 }
 
 @code {
-    [Parameter] public int TmdbId { get; set; }  // ID de la película recibido desde la URL
+    [Parameter] public int TmdbId { get; set; }
 
-    // Estado y datos de la película
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
     private TmdbMovieDetail? Movie;
     private bool IsLoading = true;
     private bool IsInWatchlist = false;
@@ -161,32 +168,40 @@ else
     private bool IsWatched = false;
     private bool ShowingToast = false;
     private string ToastMessage = string.Empty;
+    private int? _userId;
 
-    // Inicialización del componente: obtiene datos de la película y estado en watchlist
     protected override async Task OnInitializedAsync()
     {
-        Movie = await TmdbService.GetMovieDetailAsync(TmdbId);  // Obtiene los detalles de TMDB
-        IsInWatchlist = await WatchlistService.IsInWatchlistAsync(TmdbId);  // Comprueba si está en la lista
-
-        if (IsInWatchlist)
+        var auth = await AuthStateTask;
+        if (auth.User.Identity?.IsAuthenticated == true)
         {
-            // Obtiene información adicional (favorito, visto) de la película en la lista
-            var items = await WatchlistService.GetAllAsync();
-            var item = items.FirstOrDefault(w => w.TmdbId == TmdbId);
-            if (item is not null)
+            var claim = auth.User.FindFirst(ClaimTypes.NameIdentifier);
+            if (claim != null) _userId = int.Parse(claim.Value);
+        }
+
+        Movie = await TmdbService.GetMovieDetailAsync(TmdbId);
+
+        if (_userId.HasValue)
+        {
+            IsInWatchlist = await WatchlistService.IsInWatchlistAsync(TmdbId, _userId.Value);
+            if (IsInWatchlist)
             {
-                IsFavorite = item.IsFavorite;
-                IsWatched = item.IsWatched;
+                var items = await WatchlistService.GetAllAsync(_userId.Value);
+                var item = items.FirstOrDefault(w => w.TmdbId == TmdbId);
+                if (item is not null)
+                {
+                    IsFavorite = item.IsFavorite;
+                    IsWatched = item.IsWatched;
+                }
             }
         }
 
-        IsLoading = false;  // Finaliza el estado de carga
+        IsLoading = false;
     }
 
-    // Método para agregar la película a la lista de seguimiento
     private async Task AddToWatchlist()
     {
-        if (Movie is null) return;
+        if (Movie is null || !_userId.HasValue) return;
 
         var tmdbMovie = new TmdbMovie
         {
@@ -198,23 +213,23 @@ else
             VoteAverage = Movie.VoteAverage
         };
 
-        await WatchlistService.AddToWatchlistAsync(tmdbMovie);
+        await WatchlistService.AddToWatchlistAsync(tmdbMovie, _userId.Value);
         IsInWatchlist = true;
         await MostrarToast("✅ Agregada a tu lista");
     }
 
-    // Método para alternar el estado de favorito
     private async Task ToggleFavorite()
     {
-        await WatchlistService.ToggleFavoriteAsync(TmdbId);
+        if (!_userId.HasValue) return;
+        await WatchlistService.ToggleFavoriteAsync(TmdbId, _userId.Value);
         IsFavorite = !IsFavorite;
         await MostrarToast(IsFavorite ? "❤️ Agregada a favoritos" : "💔 Quitada de favoritos");
     }
 
-    // Método para alternar el estado de visto/pendiente
     private async Task ToggleWatched()
     {
-        await WatchlistService.ToggleWatchedAsync(TmdbId);
+        if (!_userId.HasValue) return;
+        await WatchlistService.ToggleWatchedAsync(TmdbId, _userId.Value);
         IsWatched = !IsWatched;
         await MostrarToast(IsWatched ? "👁️ Marcada como vista" : "↩️ Marcada como pendiente");
     }
