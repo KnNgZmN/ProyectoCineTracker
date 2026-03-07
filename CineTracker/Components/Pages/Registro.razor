@@ -1,0 +1,170 @@
+@* Ruta de la página: accesible en /registro *@
+@page "/registro"
+
+@* Usa AuthLayout para mostrar la página sin la barra de navegación *@
+@layout AuthLayout
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using Microsoft.AspNetCore.Http
+@using CineTracker.Services
+@using CineTracker.Components.Layout
+
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Crear cuenta — CineTracker</PageTitle>
+
+<div class="auth-wrapper">
+    <div class="auth-card">
+
+        <a href="/" class="auth-logo">CINE<span>Tracker</span></a>
+        <p class="auth-subtitle">Tu gestor de películas favoritas</p>
+        <h2 class="auth-title">Crear cuenta</h2>
+
+        @* Mensaje de error si el registro falla (email duplicado, contraseñas distintas, etc.) *@
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="auth-error">@ErrorMessage</div>
+        }
+
+        @* @formname="registro-form": nombre único para que Blazor distinga este formulario
+           de otros en la misma app al procesar el POST *@
+        <form method="post" @formname="registro-form">
+
+            @* Token de protección CSRF generado por Blazor automáticamente *@
+            <AntiforgeryToken />
+
+            <div class="auth-form-group">
+                <label for="nombreUsuario">Nombre de usuario</label>
+                @* name="NombreUsuario" debe ser idéntico al nombre de la propiedad
+                   marcada con [SupplyParameterFromForm] en el bloque @code *@
+                <input id="nombreUsuario" name="NombreUsuario" type="text"
+                       placeholder="cinefilo123"
+                       autocomplete="username"
+                       value="@NombreUsuario" />
+            </div>
+
+            <div class="auth-form-group">
+                <label for="email">Correo electrónico</label>
+                <input id="email" name="Email" type="email"
+                       placeholder="tu@email.com"
+                       autocomplete="email"
+                       value="@Email" />
+            </div>
+
+            <div class="auth-form-group">
+                <label for="password">Contraseña</label>
+                <input id="password" name="Password" type="password"
+                       placeholder="••••••••"
+                       autocomplete="new-password" />
+                <p class="auth-hint">Mínimo 6 caracteres</p>
+            </div>
+
+            <div class="auth-form-group">
+                <label for="confirmPassword">Confirmar contraseña</label>
+                <input id="confirmPassword" name="ConfirmPassword" type="password"
+                       placeholder="••••••••"
+                       autocomplete="new-password" />
+            </div>
+
+            <button type="submit" class="btn-auth">Crear cuenta</button>
+        </form>
+
+        <div class="auth-footer">
+            ¿Ya tienes cuenta? <a href="/login">Iniciar sesión</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    @* HttpContext permite leer el verbo HTTP (GET/POST) y escribir la cookie de sesión.
+       Solo disponible durante el renderizado SSR, por eso no hay @rendermode aquí. *@
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    @* Cada [SupplyParameterFromForm] captura el valor del campo HTML
+       cuyo atributo "name" coincide con el nombre de la propiedad *@
+    [SupplyParameterFromForm]
+    private string? NombreUsuario { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? Email { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? Password { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? ConfirmPassword { get; set; }
+
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Si es GET (navegación normal), solo muestra el formulario vacío
+        if (!HttpMethods.IsPost(HttpContext.Request.Method))
+            return;
+
+        // Validación 1: todos los campos deben estar completos
+        if (string.IsNullOrWhiteSpace(NombreUsuario) || string.IsNullOrWhiteSpace(Email) ||
+            string.IsNullOrWhiteSpace(Password) || string.IsNullOrWhiteSpace(ConfirmPassword))
+        {
+            ErrorMessage = "Por favor completa todos los campos.";
+            return;
+        }
+
+        // Validación 2: las contraseñas deben coincidir
+        if (Password != ConfirmPassword)
+        {
+            ErrorMessage = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        // Validación 3: longitud mínima de contraseña
+        if (Password.Length < 6)
+        {
+            ErrorMessage = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
+
+        // RegistrarAsync:
+        // 1. Verifica que email y nombre de usuario no existan en SQL Server
+        // 2. Crea el hash de la contraseña con PBKDF2
+        // 3. Inserta el nuevo registro en la tabla Usuarios
+        // Retorna (true, "") si OK, o (false, "mensaje de error") si falla
+        var (success, error) = await AuthService.RegistrarAsync(NombreUsuario, Email, Password);
+
+        if (!success)
+        {
+            ErrorMessage = error; // Muestra el error en el formulario (email duplicado, etc.)
+            return;
+        }
+
+        // Registro exitoso: iniciamos sesión automáticamente para no obligar
+        // al usuario a pasar por el formulario de login después de registrarse
+        var usuario = await AuthService.LoginAsync(Email, Password);
+        if (usuario is not null)
+        {
+            // Construimos los claims con los datos del nuevo usuario
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, usuario.Id.ToString()), // ID en SQL Server
+                new(ClaimTypes.Name, usuario.NombreUsuario),           // Para mostrar en navbar
+                new(ClaimTypes.Email, usuario.Email)
+            };
+
+            // Creamos la identidad bajo el esquema de cookies
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+            // Escribimos la cookie en el navegador → el usuario queda autenticado
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(identity)
+            );
+        }
+
+        // Redirige a la página principal con recarga completa para activar la sesión
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

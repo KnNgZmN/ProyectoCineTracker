@@ -9,7 +9,24 @@
         /// <summary>
         /// Identificador único de la base de datos para este elemento.
         /// </summary>
+        /// <summary>
+        /// Identificador único de la base de datos para este elemento.
+        /// </summary>
         public int Id { get; set; }
+
+        /// <summary>
+        /// Clave foránea (FK) que vincula este elemento con el usuario dueño de la lista.
+        /// Se relaciona con la columna Id de la tabla Usuarios.
+        /// Si el usuario se elimina, sus registros de watchlist se eliminan en cascada (ON DELETE CASCADE).
+        /// </summary>
+        public int UsuarioId { get; set; }
+
+        /// <summary>
+        /// Propiedad de navegación de Entity Framework.
+        /// Permite acceder al objeto Usuario completo desde un WatchListItem.
+        /// Es nullable porque EF no siempre carga la relación (lazy/eager loading).
+        /// </summary>
+        public Usuario? Usuario { get; set; }
 
         /// <summary>
         /// Identificador de la película en TMDB (The Movie Database).

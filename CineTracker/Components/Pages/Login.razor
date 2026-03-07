@@ -1,0 +1,165 @@
+@* Ruta de la página: accesible en /login *@
+@page "/login"
+
+@* Usa AuthLayout en lugar de MainLayout para mostrar la página sin la barra de navegación *@
+@layout AuthLayout
+
+@* System.Security.Claims: contiene ClaimTypes (NameIdentifier, Name, Email)
+   que son los "datos del usuario" que se guardan dentro de la cookie de sesión *@
+@using System.Security.Claims
+
+@* Microsoft.AspNetCore.Authentication: contiene el método de extensión SignInAsync
+   que escribe la cookie en el navegador del usuario *@
+@using Microsoft.AspNetCore.Authentication
+
+@* Microsoft.AspNetCore.Authentication.Cookies: contiene CookieAuthenticationDefaults
+   con el nombre del esquema de autenticación ("Cookies") *@
+@using Microsoft.AspNetCore.Authentication.Cookies
+
+@* Microsoft.AspNetCore.Http: contiene HttpMethods.IsPost() para verificar el verbo HTTP *@
+@using Microsoft.AspNetCore.Http
+
+@using CineTracker.Services
+@using CineTracker.Components.Layout
+
+@* AuthService maneja la lógica de login contra la base de datos SQL Server *@
+@inject AuthService AuthService
+
+@* NavigationManager permite redirigir al usuario después de iniciar sesión *@
+@inject NavigationManager Navigation
+
+<PageTitle>Iniciar sesión — CineTracker</PageTitle>
+
+<div class="auth-wrapper">
+    <div class="auth-card">
+
+        <a href="/" class="auth-logo">CINE<span>Tracker</span></a>
+        <p class="auth-subtitle">Tu gestor de películas favoritas</p>
+        <h2 class="auth-title">Iniciar sesión</h2>
+
+        @* Muestra el mensaje de error solo si existe *@
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="auth-error">@ErrorMessage</div>
+        }
+
+        @* method="post": el formulario envía los datos como HTTP POST (no como parámetros en la URL)
+           @formname="login-form": nombre único que Blazor usa para identificar este formulario
+           en el servidor al procesar el POST con [SupplyParameterFromForm] *@
+        <form method="post" @formname="login-form">
+
+            @* AntiforgeryToken inyecta un token oculto en el formulario
+               que protege contra ataques CSRF (Cross-Site Request Forgery).
+               Blazor valida este token automáticamente al recibir el POST. *@
+            <AntiforgeryToken />
+
+            <div class="auth-form-group">
+                <label for="email">Correo electrónico</label>
+                @* name="Email" debe coincidir exactamente con la propiedad [SupplyParameterFromForm]
+                   para que Blazor mapee el valor del campo al código C# *@
+                <input id="email" name="Email" type="email"
+                       placeholder="tu@email.com"
+                       autocomplete="email"
+                       value="@Email" />
+            </div>
+
+            <div class="auth-form-group">
+                <label for="password">Contraseña</label>
+                <input id="password" name="Password" type="password"
+                       placeholder="••••••••"
+                       autocomplete="current-password" />
+            </div>
+
+            <button type="submit" class="btn-auth">Entrar</button>
+        </form>
+
+        <div class="auth-footer">
+            ¿No tienes cuenta? <a href="/registro">Regístrate gratis</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    @* [CascadingParameter] recibe el HttpContext (solicitud HTTP actual) que
+       proporciona Blazor durante el renderizado estático (SSR).
+       Permite leer datos de la solicitud y escribir cookies en la respuesta.
+       IMPORTANTE: solo está disponible durante el renderizado SSR inicial,
+       no durante la conexión SignalR interactiva. Por eso esta página
+       NO tiene @rendermode InteractiveServer. *@
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    @* [SupplyParameterFromForm] lee el valor del campo del formulario HTTP POST
+       cuyo atributo name="Email" y lo asigna a esta propiedad automáticamente.
+       Solo funciona en componentes de renderizado estático (SSR). *@
+    [SupplyParameterFromForm]
+    private string? Email { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? Password { get; set; }
+
+    // Mensaje de error que se muestra en pantalla si el login falla
+    private string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// Se ejecuta cada vez que el componente se inicializa:
+    /// - En GET (carga de página): no hace nada, solo muestra el formulario
+    /// - En POST (envío del formulario): procesa las credenciales
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        // HttpMethods.IsPost() verifica que el verbo HTTP sea POST.
+        // Cuando el usuario simplemente navega a /login es GET → salimos sin procesar.
+        // Cuando envía el formulario es POST → continuamos con el login.
+        if (!HttpMethods.IsPost(HttpContext.Request.Method))
+            return;
+
+        // Validación básica antes de consultar la base de datos
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        {
+            ErrorMessage = "Por favor completa todos los campos.";
+            return;
+        }
+
+        // Llama al AuthService que:
+        // 1. Busca el usuario por email en SQL Server
+        // 2. Verifica la contraseña con PasswordHasher (PBKDF2)
+        // 3. Retorna el Usuario si es correcto, o null si falla
+        var usuario = await AuthService.LoginAsync(Email, Password);
+
+        if (usuario is null)
+        {
+            ErrorMessage = "Email o contraseña incorrectos.";
+            return;
+        }
+
+        // CLAIMS: son los "datos del usuario" que se codifican dentro de la cookie.
+        // Funcionan como un "carnet de identidad" digital que la app puede leer
+        // en cualquier momento sin consultar la base de datos.
+        // - NameIdentifier: el ID del usuario en SQL Server (para queries futuras)
+        // - Name: el nombre visible (se muestra en la navbar)
+        // - Email: el email del usuario
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, usuario.Id.ToString()), // Guardamos el ID como string
+            new(ClaimTypes.Name, usuario.NombreUsuario),
+            new(ClaimTypes.Email, usuario.Email)
+        };
+
+        // ClaimsIdentity agrupa todos los claims bajo un esquema de autenticación.
+        // El esquema "Cookies" indica que la identidad se persiste en una cookie HTTP.
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+        // SignInAsync serializa la identidad, la cifra y la escribe como cookie
+        // en el navegador del usuario. A partir de aquí, cada solicitud que haga
+        // el usuario incluirá esta cookie automáticamente.
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(identity)
+        );
+
+        // forceLoad: true fuerza una recarga completa de la página para que
+        // Blazor reconozca la nueva cookie de autenticación
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

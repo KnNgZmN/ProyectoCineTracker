@@ -1,0 +1,27 @@
+@inject NavigationManager Navigation
+
+@* Componente auxiliar sin interfaz visual.
+   Se usa en Routes.razor dentro del bloque <NotAuthorized> de AuthorizeRouteView.
+   Cuando un usuario no autenticado intenta acceder a una página con [Authorize]
+   (como MiLista), Blazor renderiza este componente en su lugar.
+
+   ¿Por qué un componente separado y no NavigateTo directamente en Routes.razor?
+   Porque NavigateTo no puede llamarse durante el renderizado del árbol de componentes.
+   Al ponerlo en OnInitialized(), se ejecuta después del renderizado inicial,
+   que es el momento correcto para hacer una redirección. *@
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Captura la URL actual para poder redirigir de vuelta después del login.
+        // Uri.EscapeDataString codifica caracteres especiales de la URL (/, ?, &, etc.)
+        // para que puedan pasarse como valor de un parámetro query sin ambigüedad.
+        // Ejemplo: "/mi-lista" se convierte en "%2Fmi-lista"
+        var returnUrl = Uri.EscapeDataString(Navigation.Uri);
+
+        // forceLoad: true fuerza una recarga HTTP completa en lugar de navegación SPA.
+        // Es necesario porque /login es una página SSR (sin @rendermode InteractiveServer)
+        // y necesita una solicitud HTTP real para funcionar correctamente.
+        Navigation.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: true);
+    }
+}

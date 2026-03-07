@@ -2,6 +2,8 @@ using CineTracker;
 using CineTracker.Components;
 using CineTracker.Data;
 using CineTracker.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
 
@@ -45,6 +47,7 @@ builder.Services.AddDbContextFactory<CineTrackerContext>(options =>
 /// </summary>
 builder.Services.AddHttpClient<TmdbService>();
 builder.Services.AddScoped<WatchlistService>();
+builder.Services.AddScoped<AuthService>();
 
 /// <summary>
 /// Registro de Razor Components y configuración interactiva del lado del servidor.
@@ -52,6 +55,17 @@ builder.Services.AddScoped<WatchlistService>();
 /// </summary>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.AccessDeniedPath = "/login";
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+    });
+
+builder.Services.AddCascadingAuthenticationState();
 
 /// <summary>
 /// Construye la aplicación con toda la configuración de servicios y pipeline.
@@ -80,6 +94,9 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 /// </summary>
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 /// <summary>
 /// Habilita protección antifalsificación (CSRF) en formularios y acciones sensibles.
 /// </summary>
@@ -89,6 +106,12 @@ app.UseAntiforgery();
 /// Mapea los archivos estáticos (CSS, JS, imágenes).
 /// </summary>
 app.MapStaticAssets();
+
+app.MapGet("/logout", async (HttpContext http) =>
+{
+    await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.Redirect("/");
+}).AllowAnonymous();
 
 /// <summary>
 /// Mapea el componente raíz Razor <App> para renderizado interactivo del servidor.

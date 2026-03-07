@@ -1,14 +1,20 @@
-﻿@using CineTracker.Models
+@using CineTracker.Models
 @using CineTracker.Services
-@inject TmdbService TmdbService          // Servicio para obtener URLs de imágenes de TMDB -->
-@inject WatchlistService WatchlistService  // Servicio para manejar la lista de seguimiento -->
-@inject NavigationManager Navigation      // Servicio para navegación entre páginas -->
+@using System.Security.Claims
+@inject TmdbService TmdbService
+@inject WatchlistService WatchlistService
+@inject NavigationManager Navigation
 
-<!-- Tarjeta de película interactiva -->
+@* Tarjeta de película con lógica de autenticación integrada.
+   Si el usuario está logueado puede agregar la película a su lista personal.
+   Si no lo está, el botón lo redirige a /login. *@
 <div class="movie-card" @onclick="GoToDetail">
+
+    @* Imagen del poster. PosterPath viene de la API de TMDB como ruta relativa
+       (ej: "/abc123.jpg"). TmdbService.GetImageUrl() le antepone la URL base
+       "https://image.tmdb.org/t/p/w500" para formar la URL completa. *@
     @if (!string.IsNullOrEmpty(Movie.PosterPath))
     {
-        <!-- Imagen del poster de la película -->
         <img class="movie-poster"
              src="@TmdbService.GetImageUrl(Movie.PosterPath)"
              alt="@Movie.Title"
@@ -16,32 +22,41 @@
     }
     else
     {
-        <!-- Placeholder si no hay poster disponible -->
         <div class="movie-poster-placeholder">🎬</div>
     }
 
-    <!-- Cuerpo de la tarjeta: título y metadatos -->
     <div class="movie-card-body">
-        <!-- Título de la película con tooltip completo -->
         <div class="movie-card-title" title="@Movie.Title">@Movie.Title</div>
-
-        <!-- Metadatos: calificación y año de estreno -->
         <div class="movie-card-meta">
+            @* VoteAverage viene de TMDB: promedio de votos de usuarios (0.0 - 10.0) *@
             <span class="movie-rating">⭐ @Movie.VoteAverage.ToString("F1")</span>
             <span class="movie-year">@GetYear()</span>
         </div>
     </div>
 
-    <!-- Overlay con botones de acción (solo visible al hover) -->
+    @* Overlay con botones que aparece al pasar el mouse sobre la tarjeta *@
     <div class="movie-card-overlay">
         <div class="overlay-buttons">
-            <!-- Botón para agregar a Mi Lista -->
-            <button class="btn-overlay btn-add" @onclick:stopPropagation="true"
-                    @onclick="AddToWatchlist">
-                @(IsAdded ? "✅ Agregada" : "+ Mi Lista")
-            </button>
 
-            <!-- Botón para ir al detalle de la película -->
+            @* Muestra botones diferentes según si el usuario está autenticado o no *@
+            @if (_userId.HasValue)
+            {
+                @* Usuario logueado: puede agregar a su lista personal *@
+                <button class="btn-overlay btn-add" @onclick:stopPropagation="true"
+                        @onclick="AddToWatchlist">
+                    @* Cambia el texto según si ya está agregada o no *@
+                    @(IsAdded ? "✅ Agregada" : "+ Mi Lista")
+                </button>
+            }
+            else
+            {
+                @* Usuario no logueado: el botón redirige al login en lugar de agregar *@
+                <button class="btn-overlay btn-add" @onclick:stopPropagation="true"
+                        @onclick="IrAlLogin">
+                    🔒 Inicia sesión
+                </button>
+            }
+
             <button class="btn-overlay btn-detail" @onclick:stopPropagation="true"
                     @onclick="GoToDetail">
                 Ver más
@@ -51,40 +66,80 @@
 </div>
 
 @code {
-    // Parámetros recibidos desde el padre
-    [Parameter] public TmdbMovie Movie { get; set; } = default!;  // Datos de la película
-    [Parameter] public EventCallback OnAdded { get; set; }        // Evento opcional cuando se agrega a la lista
+    @* Movie: datos de la película que vienen de la API de TMDB.
+       El componente padre (Home, Buscar) los pasa como parámetro. *@
+    [Parameter] public TmdbMovie Movie { get; set; } = default!;
 
-    // Estado interno
-    private bool IsAdded = false;  // Indica si la película ya está en la watchlist
+    @* Callback opcional: el padre puede suscribirse para saber cuándo
+       se agrega una película (usado en Home para mostrar el toast). *@
+    [Parameter] public EventCallback OnAdded { get; set; }
 
-    // Inicialización: verifica si la película ya está en la watchlist
+    @* [CascadingParameter] recibe el estado de autenticación que fue registrado
+       globalmente con builder.Services.AddCascadingAuthenticationState() en Program.cs.
+       Task<AuthenticationState> es asíncrono porque puede necesitar tiempo para
+       verificar la cookie en el servidor. *@
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    // Estado local del componente
+    private bool IsAdded = false;  // Indica si esta película ya está en la lista del usuario
+
+    // ID del usuario autenticado extraído de los claims de la cookie.
+    // Es nullable: null significa que el usuario no está logueado.
+    private int? _userId;
+
     protected override async Task OnInitializedAsync()
     {
-        IsAdded = await WatchlistService.IsInWatchlistAsync(Movie.Id);
+        // Resolvemos el Task para obtener el estado de autenticación actual
+        var auth = await AuthStateTask;
+
+        // IsAuthenticated es true si existe una cookie de sesión válida
+        if (auth.User.Identity?.IsAuthenticated == true)
+        {
+            // FindFirst busca el claim de tipo NameIdentifier dentro de la cookie.
+            // Lo guardamos como string en el claim, así que lo parseamos a int.
+            // Este ID nos permite consultar la base de datos filtrando por usuario.
+            var claim = auth.User.FindFirst(ClaimTypes.NameIdentifier);
+            if (claim != null)
+            {
+                _userId = int.Parse(claim.Value);
+
+                // Consulta SQL Server para saber si esta película ya está
+                // en la lista de este usuario específico
+                IsAdded = await WatchlistService.IsInWatchlistAsync(Movie.Id, _userId.Value);
+            }
+        }
     }
 
-    // Método auxiliar para obtener el año de estreno
+    /// <summary>
+    /// Extrae el año de estreno del formato "YYYY-MM-DD" que devuelve la API de TMDB.
+    /// </summary>
     private string GetYear()
     {
         if (string.IsNullOrEmpty(Movie.ReleaseDate)) return "N/A";
+        // ReleaseDate viene de TMDB en formato "2023-07-19", tomamos solo los primeros 4 caracteres
         return Movie.ReleaseDate.Length >= 4 ? Movie.ReleaseDate[..4] : "N/A";
     }
 
-    // Agrega la película a la lista de seguimiento
+    /// <summary>
+    /// Agrega la película a la lista personal del usuario en SQL Server.
+    /// Solo se ejecuta si el usuario está autenticado (_userId tiene valor).
+    /// </summary>
     private async Task AddToWatchlist()
     {
-        if (IsAdded) return;  // Evita agregar más de una vez
-        await WatchlistService.AddToWatchlistAsync(Movie);
+        if (!_userId.HasValue || IsAdded) return;
+
+        // Guarda en SQL Server una copia de los datos de TMDB asociada al usuario
+        await WatchlistService.AddToWatchlistAsync(Movie, _userId.Value);
         IsAdded = true;
 
-        // Invoca un callback opcional para notificar al componente padre
+        // Notifica al componente padre (Home/Buscar) para mostrar el toast
         await OnAdded.InvokeAsync();
     }
 
-    // Navega a la página de detalle de la película
-    private void GoToDetail()
-    {
-        Navigation.NavigateTo($"/pelicula/{Movie.Id}");
-    }
+    // Redirige al login cuando un usuario no autenticado intenta guardar
+    private void IrAlLogin() => Navigation.NavigateTo("/login");
+
+    // Navega a la página de detalle usando el ID de TMDB en la URL
+    private void GoToDetail() => Navigation.NavigateTo($"/pelicula/{Movie.Id}");
 }

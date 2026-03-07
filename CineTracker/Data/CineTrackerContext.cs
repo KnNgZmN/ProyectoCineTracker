@@ -30,6 +30,11 @@ namespace CineTracker.Data
         /// </summary>
         public DbSet<WatchListItem> WatchlistItems { get; set; }
 
+        /// <summary>
+        /// Tabla que almacena los usuarios registrados en la aplicación.
+        /// </summary>
+        public DbSet<Usuario> Usuarios { get; set; }
+
         #endregion
 
         /// <summary>
@@ -54,12 +59,24 @@ namespace CineTracker.Data
             // Configuración de la entidad WatchlistItems
             modelBuilder.Entity<WatchListItem>(entity =>
             {
-                entity.HasKey(e => e.Id);  // Clave primaria
-                entity.Property(e => e.Title)
-                      .IsRequired()        // Campo obligatorio
-                      .HasMaxLength(200);  // Longitud máxima 200 caracteres
-                entity.Property(e => e.PosterPath)
-                      .HasMaxLength(500);  // Longitud máxima 500 caracteres para la URL del poster
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.PosterPath).HasMaxLength(500);
+                entity.HasOne(e => e.Usuario)
+                      .WithMany()
+                      .HasForeignKey(e => e.UsuarioId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configuración de la entidad Usuario
+            modelBuilder.Entity<Usuario>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.Email).IsUnique();
+                entity.HasIndex(e => e.NombreUsuario).IsUnique();
+                entity.Property(e => e.NombreUsuario).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Email).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.PasswordHash).IsRequired();
             });
         }
     }
